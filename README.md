@@ -128,6 +128,42 @@ redundant copies, not early warnings.
 
 Decision recorded rather than silently skipped: cross-link features are not built.
 
+### [`notebooks/08_adaptive_routing.ipynb`](notebooks/08_adaptive_routing.ipynb)
+
+Dijkstra with congestion-aware edge costs, `cost(e) = w(e) / (1 − u(e))` — the real
+OSPF weight inflated by the M/M/1 delay factor. No tuning knobs; it collapses to
+plain OSPF when the network is quiet (1.03× at typical 3% load) and bites hard when
+it is not (4× at 75%). Routing for each interval is computed from the **previous**
+interval's measured demand, so nothing depends on knowing the future.
+
+The baseline is recomputed, not asserted: Dijkstra on the real OSPF weights
+reproduces the shipped routing matrix **exactly** and the notebook 01 utilisation
+to `0.000e+00`.
+
+**A first attempt failed instructively** and is kept in the notebook. Rerouting all
+flows simultaneously against a stale snapshot drove peak utilisation to **290%** —
+every flow picked the same newly-cheap path and collectively overloaded it, landing
+on `ATLAng,IPLSng`, one of only two OC-48 links. The fix is **sequential
+assignment** (route flows largest-first, updating load after each), which is
+standard traffic-engineering practice.
+
+| Metric | OSPF | Adaptive | Change |
+|---|---|---|---|
+| worst link, whole series | 75.36% | 74.48% | −1.16% |
+| p95 per-timestep peak | 15.80% | 15.36% | −2.78% |
+| mean peak, congested steps | 44.79% | 43.72% | **−2.4%** |
+
+It relieves rather than relocates (spread and std both improve, no link over 100%,
+total network load unchanged at −0.02%), at the cost of some churn: 91% of
+timesteps see at least one path change, though only ~4 of 144 flows move on average.
+
+**Why the gain is small, and why that is not the algorithm's fault:** at the worst
+timestep a single OD flow carries **5.71 Gbps — 57% of all traffic on the network,
+and 57.6% of a 9.92 Gbps link on its own**. Single-path routing must place that
+whole flow on one path, so every link it crosses is ≥57.6% regardless of cost
+function. Beating that needs flow *splitting* (ECMP / MPLS-TE), a different
+mechanism.
+
 Each notebook ends with inline pass/fail sanity checks and prints its own
 verification, so correctness is visible in the notebook rather than hidden in a
 test suite.
@@ -155,7 +191,8 @@ TRAFFIC-CONGESTION-PREDICTION/
 │   ├── 04_cv_split.ipynb
 │   ├── 05_baseline_model.ipynb
 │   ├── 06_forecast_horizons.ipynb
-│   └── 07_crosslink_premise.ipynb
+│   ├── 07_crosslink_premise.ipynb
+│   └── 08_adaptive_routing.ipynb
 ├── results/
 │   ├── figures/
 │   └── metrics/
@@ -295,8 +332,9 @@ the GÉANT dataset requires attribution.
 - [x] Baseline congestion classifier (XGBoost) — beats naive, not persistence
 - [x] Longer forecast horizons (15 / 30 min) — model still loses to persistence
 - [x] Cross-link features — premise tested and rejected (no lead-lag structure)
-- [ ] Adaptive routing: Dijkstra with congestion-aware dynamic edge costs
-- [ ] Evaluation vs. OSPF shortest-path baseline (peak link utilisation reduction)
+- [x] Adaptive routing: Dijkstra with congestion-aware dynamic edge costs
+- [x] Evaluation vs. OSPF shortest-path baseline (peak link utilisation reduction)
+- [ ] Optional: multipath / flow splitting, the only way past the 57.6% floor
 
 ---
 
