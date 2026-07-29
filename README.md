@@ -81,9 +81,38 @@ Against always-predict-Low the model looks strong (macro-F1 **0.75–0.85** vs
 this link was in 5 minutes ago" — it does **not** win: persistence scores higher on
 3 of 5 folds and ties on the rest.
 
-That is a finding about the task framing, not a bug. Predicting time *t* from
-*t − 5 min* on a smooth series is nowcasting, and `lag_1` nearly determines the
-label. Pushing the horizon to *t + 15/30 min* is the next step.
+That looked like a task-framing problem: predicting time *t* from *t − 5 min* on a
+smooth series is nowcasting, and `lag_1` nearly determines the label. Notebook 06
+tests that explanation.
+
+### [`notebooks/06_forecast_horizons.ipynb`](notebooks/06_forecast_horizons.ipynb)
+
+Retrains at **15 and 30 minutes** ahead — same features, same folds, same model
+settings, only the target changes. The persistence baseline is recomputed for each
+horizon rather than carried over.
+
+**The explanation was wrong.** The model does not beat persistence at any horizon,
+and the gap *widens*:
+
+| Lead time | Model macro-F1 | Persistence macro-F1 | Difference |
+|---|---|---|---|
+| 5 min | 0.8065 | 0.8150 | −0.0085 |
+| 15 min | 0.7268 | 0.7371 | −0.0103 |
+| 30 min | 0.6791 | 0.6948 | −0.0157 |
+
+One confounder was found and ruled out first: the cyclical clock features were
+anchored to the prediction time rather than the target time, an error that grows
+with the horizon and could have manufactured the widening gap by itself. Fixing it
+moved the gap by 0.0003–0.0011 — real bug, immaterial effect.
+
+Reported as a real result rather than tuned away: **with per-link history and
+time-of-day features, a learned classifier does not beat "assume nothing changed"
+at any horizon tested.** Mean Critical F1 also falls 0.752 → 0.620 → 0.534.
+
+The likely cause is train/test distribution shift (the model does best relative to
+persistence on the calmest fold and worst on the most episode-dominated one).
+The most promising next direction is features that see *neighbouring* links —
+information persistence structurally cannot use — not a longer horizon.
 
 Each notebook ends with inline pass/fail sanity checks and prints its own
 verification, so correctness is visible in the notebook rather than hidden in a
@@ -110,7 +139,8 @@ TRAFFIC-CONGESTION-PREDICTION/
 │   ├── 02_labeling_and_features.ipynb
 │   ├── 03_eda.ipynb
 │   ├── 04_cv_split.ipynb
-│   └── 05_baseline_model.ipynb
+│   ├── 05_baseline_model.ipynb
+│   └── 06_forecast_horizons.ipynb
 ├── results/
 │   ├── figures/
 │   └── metrics/
@@ -248,7 +278,8 @@ the GÉANT dataset requires attribution.
 - [x] Exploratory data analysis
 - [x] Time-series cross-validation split with per-fold threshold refitting
 - [x] Baseline congestion classifier (XGBoost) — beats naive, not persistence
-- [ ] Move to a real forecast horizon (t+15 / t+30 min)
+- [x] Longer forecast horizons (15 / 30 min) — model still loses to persistence
+- [ ] Cross-link (neighbouring-link) features
 - [ ] Adaptive routing: Dijkstra with congestion-aware dynamic edge costs
 - [ ] Evaluation vs. OSPF shortest-path baseline (peak link utilisation reduction)
 
