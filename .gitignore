@@ -76,6 +76,9 @@ results/figures/*
 results/metrics/*
 !results/metrics/.gitkeep
 
+# --- Run logs (scripts/run_notebook.sh) ---
+logs/
+
 # --- Local overrides ---
 .env
 configs/local.yaml
