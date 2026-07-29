@@ -1,0 +1,69 @@
+# Default experiment configuration.
+# Phase 1 scaffold: paths and dataset facts verified against the real data.
+# Modelling/feature sections are placeholders and will be filled in later phases.
+
+project:
+  name: intelligent-network-congestion-prediction
+  seed: 42
+
+paths:
+  raw: data/raw
+  processed: data/processed
+  figures: results/figures
+  metrics: results/metrics
+
+datasets:
+  primary: abilene
+  secondary: geant
+
+  abilene:
+    root: data/raw/abilene
+    topology: topo-2003-04-10.txt
+    links: links
+    demands: demands
+    routing_matrix: A
+    traffic_matrices: traffic-matrices        # X01.gz .. X24.gz
+    weeks: 24
+    timesteps_per_week: 2016
+    interval_seconds: 300
+    n_nodes: 12
+    n_directed_links: 30
+    n_od_pairs: 144
+    # Each row is 144 OD pairs x 5 estimates; only column 0 of each group is measured.
+    # Columns: realOD | simpleGravity | simpleTomogravity | generalGravity | generalTomogravity
+    od_column_stride: 5
+    od_column_offset: 0
+    # Raw unit is (100 bytes / 5 min); 100 = packet sampling rate.
+    raw_unit: "100_bytes_per_300s"
+    # 100 bytes * 8 bits / 300 s / 1000 = 4/1500 exactly; full double precision
+    # so the stored constant does not introduce avoidable rounding error.
+    to_kbps_factor: 0.0026666666666666666
+
+  geant:
+    root: data/raw/geant
+    archive: traffic-matrices-anonymized-v2.tar.bz2
+    topology: topology-anonymised.xml
+    interval_seconds: 900
+    n_nodes: 23
+    n_directed_links: 74
+    n_matrices: 10772
+    units: kbps
+    has_capacities: false                    # see docs/dataset_selection.md
+
+# Congestion is defined per-link relative to that link's own utilisation
+# distribution, because Abilene was over-provisioned (mean utilisation ~2.7%),
+# so absolute capacity thresholds would leave the high classes empty.
+# This scheme is also capacity-free, so it transfers to GEANT.
+labelling:
+  scheme: per_link_percentile
+  classes:
+    low:      [0,  50]
+    medium:   [50, 80]
+    high:     [80, 95]
+    critical: [95, 100]
+
+# --- placeholders, not yet implemented ---
+features: {}
+model: {}
+routing: {}
+evaluation: {}

@@ -1,0 +1,81 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Testing / coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Data ---
+# Hybrid policy. The bulk traffic matrices (~188 MB) are NOT committed - they are
+# publicly re-downloadable with:  python scripts/fetch_data.py
+# But the small topology/metadata files ARE committed (~220 KB): they are the
+# pieces whose loss would actually break the project, and they are cheap to keep.
+# See data/README.md for provenance and exact URLs.
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/abilene/
+!data/raw/sndlib/
+
+# Abilene: keep topology, capacities, OSPF weights, link/demand indices and the
+# routing matrix. Exclude the 170 MB of weekly traffic matrices.
+data/raw/abilene/*
+!data/raw/abilene/topo-2003-04-10.txt
+!data/raw/abilene/links
+!data/raw/abilene/demands
+!data/raw/abilene/A
+!data/raw/abilene/readme.txt
+
+# SNDlib: keep the reference topology XMLs, drop the redundant zip they came from.
+data/raw/sndlib/*
+!data/raw/sndlib/*.xml
+
+# Processed: parquet artefacts are derived and large - regenerate them.
+# The small CSVs (fold definitions, thresholds, model scores) are results worth
+# keeping in history.
+data/processed/*
+!data/processed/.gitkeep
+!data/processed/*.csv
+
+# --- Model / result artefacts ---
+*.pkl
+*.joblib
+*.model
+results/figures/*
+!results/figures/.gitkeep
+results/metrics/*
+!results/metrics/.gitkeep
+
+# --- Local overrides ---
+.env
+configs/local.yaml
