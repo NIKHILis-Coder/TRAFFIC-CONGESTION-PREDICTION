@@ -1,1 +1,263 @@
-# TRAFFIC-CONGESTION-PREDICTION
+# Intelligent Network Congestion Prediction & Adaptive Routing
+
+An end-to-end machine-learning pipeline that **predicts congestion on network links**
+from real backbone traffic measurements, then **adaptively reroutes traffic** using
+Dijkstra's algorithm with dynamic edge-cost recalculation to reduce peak link
+utilisation.
+
+Built on **real measured data** from the Internet2 Abilene backbone (48,384
+five-minute traffic matrices over six months) with real OC-192/OC-48 link capacities
+and real OSPF weights — not synthetic traffic.
+
+> **Status:** Phase 2 — data pipeline built and verified. Modelling not yet started.
+> See [`docs/dataset_selection.md`](docs/dataset_selection.md).
+
+## The notebooks
+
+The data pipeline lives in two Jupyter notebooks. They are the **canonical
+implementation** — run them in order.
+
+```bash
+jupyter notebook
+```
+
+### [`notebooks/01_data_and_utilization.ipynb`](notebooks/01_data_and_utilization.ipynb)
+
+Loads the topology, real OC-192/OC-48 capacities, and the network's **own
+OSPF-derived routing matrix** (paths are read from the data, never recomputed with
+Dijkstra), loads all 24 weekly traffic-matrix files, audits the week boundaries,
+and computes per-link utilisation as `demand @ A.T / capacity`.
+
+Output: **48,096 timesteps × 30 links**, max utilisation **75.36%**, mean **2.69%**.
+The 24 weekly files contain 4 gaps and 1 one-day overlap — see
+[`data/README.md`](data/README.md#️-the-24-weekly-files-are-not-contiguous).
+
+### [`notebooks/02_labeling_and_features.ipynb`](notebooks/02_labeling_and_features.ipynb)
+
+Applies per-link percentile congestion labels and builds 16 **gap-aware** features
+(lags, rolling mean/std, cyclical hour-of-day and day-of-week).
+
+Gap-awareness works by reindexing onto a complete 5-minute grid with
+`.asfreq("5min")` before applying `.shift()` and `.rolling()`. A lag that reaches
+across a gap lands on an empty grid slot and yields `NaN` — there is no
+gap-detection branch to get wrong. The notebook shows this concretely: at the first
+row after the 18-day gap, every gap-aware lag is `NaN` while a naive `.shift()`
+would hand the model a reading from 18 days earlier labelled "5 minutes ago".
+
+### [`notebooks/03_eda.ipynb`](notebooks/03_eda.ipynb)
+
+Exploratory analysis. Investigates the apparent "regime shift" and finds it is
+**not** one: median utilisation is flat all six months, and what changes is the
+tail. The surge is confined to **five links forming a single west-bound path**
+(Chicago → Indianapolis → Kansas City → Denver → Sunnyvale → Los Angeles), the
+reverse direction is unaffected, and it **switches on and off daily** rather than
+shifting once. A second, smaller east-bound episode appears in September.
+
+Also covers per-link distributions (80× threshold spread), inter-link correlation
+(adjacent corridor links at 0.997 — congestion travels along paths), and when
+Critical events occur (evening peak, weekdays, heavily clustered).
+
+### [`notebooks/04_cv_split.ipynb`](notebooks/04_cv_split.ipynb)
+
+Five-fold expanding-window `TimeSeriesSplit` with boundaries snapped to day edges,
+and per-link congestion thresholds **refitted on each fold's training window only**
+(fixing the leakage flagged in notebook 02). Refitting matters: the Critical line
+for the corridor links moves **4–6×** across folds, while the other 25 links move
+under 1.3×.
+
+Test-set Critical rate ranges from **0.92% (fold 4) to 10.14% (fold 5)** against a
+constant 5% in training — so per-fold scores must be reported, never just the mean.
+Fold definitions saved to `data/processed/cv_folds.csv`.
+
+### [`notebooks/05_baseline_model.ipynb`](notebooks/05_baseline_model.ipynb)
+
+First baseline: `XGBClassifier` at default-ish settings, class imbalance handled
+with `compute_sample_weight("balanced", …)`, evaluated across all 5 folds.
+`utilization_pct` is **excluded** — the label is computed from it, so including it
+would just be reading the answer.
+
+Against always-predict-Low the model looks strong (macro-F1 **0.75–0.85** vs
+**0.16–0.21**). But against a **persistence** baseline — "predict whatever class
+this link was in 5 minutes ago" — it does **not** win: persistence scores higher on
+3 of 5 folds and ties on the rest.
+
+That is a finding about the task framing, not a bug. Predicting time *t* from
+*t − 5 min* on a smooth series is nowcasting, and `lag_1` nearly determines the
+label. Pushing the horizon to *t + 15/30 min* is the next step.
+
+Each notebook ends with inline pass/fail sanity checks and prints its own
+verification, so correctness is visible in the notebook rather than hidden in a
+test suite.
+
+---
+
+## Project structure
+
+```
+TRAFFIC-CONGESTION-PREDICTION/
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── configs/                     # YAML experiment configuration
+├── data/
+│   ├── raw/                     # immutable source data (gitignored, see data/README.md)
+│   ├── processed/               # derived artefacts (gitignored)
+│   └── README.md                # dataset provenance, units, format traps
+├── docs/
+│   └── dataset_selection.md     # datasets evaluated + why this one
+├── notebooks/                   # THE PIPELINE — run these in order
+│   ├── 01_data_and_utilization.ipynb
+│   ├── 02_labeling_and_features.ipynb
+│   ├── 03_eda.ipynb
+│   ├── 04_cv_split.ipynb
+│   └── 05_baseline_model.ipynb
+├── results/
+│   ├── figures/
+│   └── metrics/
+├── scripts/
+│   └── fetch_data.py            # re-download raw data from source
+├── src/congestion/              # (empty — reserved for the routing/model phase)
+│   ├── models/
+│   ├── routing/
+│   └── evaluation/
+└── tests/
+```
+
+---
+
+## Setup
+
+### Prerequisites
+
+- **Python 3.12** — recommended and verified.
+  Python 3.13/3.14 are *not* recommended yet: wheel coverage for the ML stack
+  (NumPy / XGBoost) is still incomplete, and pip will fall back to building from
+  source. If you have multiple versions installed, the commands below pin 3.12
+  explicitly.
+- **git**
+
+Check what you have:
+
+```bash
+py -0p              # Windows: list installed Python versions
+python3 --version   # macOS / Linux
+```
+
+### 1. Clone
+
+```bash
+git clone https://github.com/NIKHILis-Coder/TRAFFIC-CONGESTION-PREDICTION.git
+cd TRAFFIC-CONGESTION-PREDICTION
+```
+
+### 2. Create the virtual environment
+
+**Windows (PowerShell):**
+```powershell
+py -3.12 -m venv .venv
+```
+
+**macOS / Linux:**
+```bash
+python3.12 -m venv .venv
+```
+
+### 3. Activate it
+
+| Shell | Command |
+|---|---|
+| PowerShell | `.\.venv\Scripts\Activate.ps1` |
+| Windows CMD | `.\.venv\Scripts\activate.bat` |
+| Git Bash (Windows) | `source .venv/Scripts/activate` |
+| macOS / Linux | `source .venv/bin/activate` |
+
+Your prompt should now be prefixed with `(.venv)`.
+
+> **PowerShell execution-policy error?** If activation fails with
+> *"running scripts is disabled on this system"*, run this once:
+> ```powershell
+> Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+> ```
+
+### 4. Install dependencies
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 5. Download the data
+
+Raw data is not committed (~188 MB, all publicly re-downloadable):
+
+```bash
+python scripts/fetch_data.py
+```
+
+Verify:
+
+```bash
+python scripts/fetch_data.py --check
+```
+
+Expect ~188 MB across `data/raw/abilene/`, `data/raw/geant/`, `data/raw/sndlib/`.
+Provenance, licensing, and format details: [`data/README.md`](data/README.md).
+
+### 6. Verify the environment
+
+```bash
+python -c "import numpy, pandas, networkx, xgboost, sklearn; print('ok')"
+```
+
+Then open the notebooks — each ends with pass/fail sanity checks that confirm the
+pipeline is working.
+
+### Deactivate
+
+```bash
+deactivate
+```
+
+---
+
+## Datasets
+
+| Role | Dataset | Timespan | Granularity | Samples |
+|---|---|---|---|---|
+| **Primary** | Abilene traffic matrices (UT Austin) | 2004-03 → 2004-09 | 5 min | 48,384 TMs |
+| **Secondary** | GÉANT (TOTEM, Uni. Liège) | 2005-01 → 2005-04 | 15 min | 10,772 TMs |
+| **Supporting** | SNDlib reference topologies | — | — | 26 networks |
+
+Abilene is the only publicly available option carrying **all four** of: topology,
+real link capacities, time-series demand, and baseline IGP routing weights. GÉANT
+provides a second, larger network to test that the pipeline generalises. Full
+evaluation of every dataset considered — including those rejected and why — is in
+[`docs/dataset_selection.md`](docs/dataset_selection.md).
+
+**If you use this data, cite the original authors** (see [`data/README.md`](data/README.md));
+the GÉANT dataset requires attribution.
+
+---
+
+## Roadmap
+
+- [x] Repository structure, virtual environment, dependency management
+- [x] Dataset research, selection, and acquisition
+- [x] Topology + traffic-matrix parsing → per-link utilisation time series
+- [x] Congestion labelling and gap-aware time-series feature engineering
+- [x] Exploratory data analysis
+- [x] Time-series cross-validation split with per-fold threshold refitting
+- [x] Baseline congestion classifier (XGBoost) — beats naive, not persistence
+- [ ] Move to a real forecast horizon (t+15 / t+30 min)
+- [ ] Adaptive routing: Dijkstra with congestion-aware dynamic edge costs
+- [ ] Evaluation vs. OSPF shortest-path baseline (peak link utilisation reduction)
+
+---
+
+## Acknowledgements
+
+Built on measurements published by the Internet2 Abilene project (via Yin Zhang, UT
+Austin), the TOTEM project at the University of Liège, and SNDlib. See
+[`data/README.md`](data/README.md) for full citations.
+
+**Author:** Nikhil Rana — B.Tech CSE, NIT Hamirpur
