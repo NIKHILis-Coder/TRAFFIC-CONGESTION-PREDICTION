@@ -111,8 +111,22 @@ at any horizon tested.** Mean Critical F1 also falls 0.752 → 0.620 → 0.534.
 
 The likely cause is train/test distribution shift (the model does best relative to
 persistence on the calmest fold and worst on the most episode-dominated one).
-The most promising next direction is features that see *neighbouring* links —
-information persistence structurally cannot use — not a longer horizon.
+
+### [`notebooks/07_crosslink_premise.ipynb`](notebooks/07_crosslink_premise.ipynb)
+
+Tests the "use neighbouring links" idea *before* building it. The premise fails:
+at a 15-minute lag, **1 link in 30** has any neighbour that predicts it better
+than its own history, by **+0.0006** — noise. The median link is 0.17 correlation
+*worse* off using a neighbour.
+
+The reason is structural. Every consecutive corridor pair peaks at **lag 0** —
+congestion does not propagate, links light up simultaneously. That follows from
+how the data is built: `link_loads(t) = demand(t) @ A.T`, and `A` has no time
+dimension, so every hop of a flow is loaded in the same timestep. The 0.997
+correlation that motivated the idea is precisely why it fails — neighbours are
+redundant copies, not early warnings.
+
+Decision recorded rather than silently skipped: cross-link features are not built.
 
 Each notebook ends with inline pass/fail sanity checks and prints its own
 verification, so correctness is visible in the notebook rather than hidden in a
@@ -140,7 +154,8 @@ TRAFFIC-CONGESTION-PREDICTION/
 │   ├── 03_eda.ipynb
 │   ├── 04_cv_split.ipynb
 │   ├── 05_baseline_model.ipynb
-│   └── 06_forecast_horizons.ipynb
+│   ├── 06_forecast_horizons.ipynb
+│   └── 07_crosslink_premise.ipynb
 ├── results/
 │   ├── figures/
 │   └── metrics/
@@ -279,7 +294,7 @@ the GÉANT dataset requires attribution.
 - [x] Time-series cross-validation split with per-fold threshold refitting
 - [x] Baseline congestion classifier (XGBoost) — beats naive, not persistence
 - [x] Longer forecast horizons (15 / 30 min) — model still loses to persistence
-- [ ] Cross-link (neighbouring-link) features
+- [x] Cross-link features — premise tested and rejected (no lead-lag structure)
 - [ ] Adaptive routing: Dijkstra with congestion-aware dynamic edge costs
 - [ ] Evaluation vs. OSPF shortest-path baseline (peak link utilisation reduction)
 
