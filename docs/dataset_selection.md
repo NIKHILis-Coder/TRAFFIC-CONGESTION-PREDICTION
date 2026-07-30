@@ -272,25 +272,27 @@ why the same pipeline can run unmodified on GÉANT despite its missing capacitie
 
 ---
 
-## 5. Open decision — raw data is 188 MB
+## 5. How the 188 MB of raw data is handled — decided
 
-`data/raw/` totals **188 MB**. **No individual file exceeds 50 MB** (largest is
-`X01.gz` at 7.3 MB), so nothing is near GitHub's 100 MB hard per-file limit — but the
-aggregate is well past what belongs in a normal git repo.
+`data/raw/` totals **188 MB**. No individual file exceeds 50 MB (largest is `X01.gz`
+at 7.3 MB), so nothing approaches GitHub's 100 MB per-file limit — but the aggregate
+is well past what belongs in a normal git repo.
 
-Current state: **`.gitignore` excludes `data/raw/`**, and `scripts/fetch_data.py`
-restores it from source. This is reversible and is **not** a final decision — the
-Git LFS vs fetch-script choice is still open, per the project owner.
+**Resolved as a hybrid**, which is what `.gitignore` now implements:
 
-| Option | Pros | Cons |
-|---|---|---|
-| **Fetch script** (current) | Repo stays ~1 MB; clean clone; no LFS quota | Depends on upstream hosts staying up |
-| **Git LFS** | Data travels with the repo; immune to link rot | Consumes LFS quota (1 GB free); needs `git lfs install` |
-| **Hybrid** | Commit the 1.7 MB of topology/metadata + GÉANT (18 MB); fetch the 164 MB of Abilene matrices | Slightly more moving parts |
+| What | Size | Committed? | Why |
+|---|---|---|---|
+| Abilene topology, capacities, OSPF weights, link/demand indices, routing matrix `A` | 28 KB | **yes** | Irreplaceable if the upstream host disappears, and effectively free |
+| SNDlib reference topologies (`*.xml`) | 195 KB | **yes** | Small, and used to cross-check the parsed topology |
+| Abilene weekly traffic matrices (`X01`–`X24`) | 164 MB | no | Bulk, and re-downloadable |
+| GÉANT archive | 18 MB | no | Bulk, and re-downloadable |
+| SNDlib zip | 793 KB | no | Redundant with the committed XMLs |
 
-The **hybrid** is worth considering: the small, hard-to-replace topology files
-(`topo-2003-04-10.txt`, `links`, `demands`, `A` — 28 KB total) are the pieces whose
-loss would actually break the project, and they cost nothing to commit.
+`scripts/fetch_data.py` restores everything excluded, so a fresh clone reaches a
+working state with one command. Git LFS was rejected: it consumes quota, requires
+`git lfs install` before cloning works properly, and buys nothing here because the
+files whose loss would actually break the project are the 28 KB that are committed
+outright.
 
 ---
 

@@ -33,15 +33,31 @@ data/
     ├── abilene_link_utilization.parquet       # tidy long: 1,442,880 rows x 7 cols
     ├── abilene_link_utilization_wide.parquet  # wide: 48,096 timesteps x 30 links
     ├── abilene_features.parquet               # labels + 16 features, 1,442,880 rows
-    └── abilene_congestion_thresholds.csv      # per-link p50/p80/p95
+    ├── abilene_congestion_thresholds.csv      # per-link p50/p80/p95 (full series)
+    ├── cv_folds.csv                           # day -> fold/part assignment
+    ├── cv_fold_thresholds.csv                 # per-link p50/p80/p95, per fold
+    ├── baseline_fold_scores.csv               # 5-minute baseline, per fold
+    ├── baseline_per_class_scores.csv          # per-class precision/recall/F1
+    ├── horizon_fold_scores.csv                # 5/15/30-minute scores, per fold
+    ├── horizon_per_class_scores.csv           # per-class, per horizon
+    ├── adaptive_routing_timeseries.csv        # peak/spread/load before vs after
+    └── adaptive_routing_per_link.csv          # per-link max, before vs after
 ```
 
-Regenerate the processed tables with:
+The `.parquet` files are large and gitignored; the small `.csv` results are
+committed, so the numbers quoted in the README can be traced back to something.
 
-Run the two notebooks in order:
+To regenerate everything, run the notebooks in order, 01 through 08. The ones that
+write to this directory:
 
 1. `notebooks/01_data_and_utilization.ipynb` — topology + traffic matrices → utilisation
 2. `notebooks/02_labeling_and_features.ipynb` — labels + gap-aware features
+3. `notebooks/04_cv_split.ipynb` — fold definitions + per-fold thresholds
+4. `notebooks/05_baseline_model.ipynb` — baseline scores
+5. `notebooks/06_forecast_horizons.ipynb` — 15/30-minute horizon scores
+6. `notebooks/08_adaptive_routing.ipynb` — routing before/after series
+
+(03 and 07 are analysis only and write nothing.)
 
 **Long format** — one row per (timestamp, link): `timestamp`, `link`, `src`, `dst`,
 `capacity_kbps`, `load_kbps`, `utilization_pct`.
@@ -63,9 +79,14 @@ step picks its own policy (XGBoost handles NaN natively).
 
 Congestion labels use per-link percentile thresholds. **The 50/30/15/5 class split is
 definitional, not empirical** — percentile labelling imposes it by construction.
-Thresholds are persisted to `abilene_congestion_thresholds.csv`; they are currently
-fit on the full series and **must be refit on the training window alone** before any
-temporal train/test split, or the label definition will have seen future data.
+
+`abilene_congestion_thresholds.csv` holds thresholds fitted on the **full series**.
+Those are fine for notebook 03's exploratory work but would leak under a temporal
+split, so notebook 04 refits them per fold on training rows only and writes
+`cv_fold_thresholds.csv`. **Notebooks 05 and 06 use the per-fold file and ignore
+both the full-series thresholds and the `congestion` column stored in the features
+table.** Refitting matters: the Critical line moves 4–6× across folds on the
+corridor links.
 
 ---
 

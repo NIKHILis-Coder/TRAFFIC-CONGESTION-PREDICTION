@@ -9,13 +9,16 @@ Built on **real measured data** from the Internet2 Abilene backbone (48,384
 five-minute traffic matrices over six months) with real OC-192/OC-48 link capacities
 and real OSPF weights — not synthetic traffic.
 
-> **Status:** Phase 2 — data pipeline built and verified. Modelling not yet started.
-> See [`docs/dataset_selection.md`](docs/dataset_selection.md).
+> **Status:** complete end to end — data pipeline, congestion classification, and
+> adaptive routing all built and evaluated. Notebooks 01–08 below record what was
+> tried, what worked, and what did not. See
+> [`docs/dataset_selection.md`](docs/dataset_selection.md) for how the data was chosen.
 
 ## The notebooks
 
-The data pipeline lives in two Jupyter notebooks. They are the **canonical
-implementation** — run them in order.
+The whole project lives in eight Jupyter notebooks. They are the **canonical
+implementation** — run them in order, 01 through 08. Each one reads what the
+previous ones wrote to `data/processed/`.
 
 ```bash
 jupyter notebook
@@ -177,7 +180,7 @@ TRAFFIC-CONGESTION-PREDICTION/
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
-├── configs/                     # YAML experiment configuration
+├── configs/                     # reference only — read by nothing (see file header)
 ├── data/
 │   ├── raw/                     # immutable source data (gitignored, see data/README.md)
 │   ├── processed/               # derived artefacts (gitignored)
@@ -193,16 +196,18 @@ TRAFFIC-CONGESTION-PREDICTION/
 │   ├── 06_forecast_horizons.ipynb
 │   ├── 07_crosslink_premise.ipynb
 │   └── 08_adaptive_routing.ipynb
-├── results/
+├── results/                     # empty — charts render inline in the notebooks
 │   ├── figures/
 │   └── metrics/
 ├── scripts/
-│   └── fetch_data.py            # re-download raw data from source
-├── src/congestion/              # (empty — reserved for the routing/model phase)
-│   ├── models/
+│   ├── fetch_data.py            # re-download raw data from source
+│   └── run_notebook.sh          # execute a notebook detached, with a DONE marker
+├── src/congestion/              # empty package stubs, kept from the original
+│   ├── models/                  #   scaffold; all work lives in the notebooks
 │   ├── routing/
 │   └── evaluation/
-└── tests/
+└── tests/                       # empty — correctness checks are inline in the
+                                 #   notebooks, printed as PASS/FAIL
 ```
 
 ---
@@ -293,6 +298,14 @@ python -c "import numpy, pandas, networkx, xgboost, sklearn; print('ok')"
 
 Then open the notebooks — each ends with pass/fail sanity checks that confirm the
 pipeline is working.
+
+Notebooks 05, 06 and 08 train models or reroute all 48,096 timesteps and take
+15–25 minutes each. To run one unattended:
+
+```bash
+bash scripts/run_notebook.sh notebooks/08_adaptive_routing.ipynb
+tail -f logs/08_adaptive_routing_run.log     # ends with DONE or FAILED
+```
 
 ### Deactivate
 

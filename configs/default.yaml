@@ -1,6 +1,14 @@
-# Default experiment configuration.
-# Phase 1 scaffold: paths and dataset facts verified against the real data.
-# Modelling/feature sections are placeholders and will be filled in later phases.
+# REFERENCE ONLY - NOT READ BY ANY CODE.
+#
+# This file was written when the pipeline lived in src/congestion/ modules that
+# loaded it with PyYAML. Those modules were replaced by the notebooks, which are
+# deliberately self-contained, so nothing reads this any more. Editing it will
+# NOT change any behaviour - the values below are duplicated inside notebooks
+# 01, 02 and 08.
+#
+# It is kept because it is a compact, verified summary of the dataset facts that
+# are easy to re-derive incorrectly (unit conversion, column stride, counts).
+# Treat it as documentation to check against, not as configuration.
 
 project:
   name: intelligent-network-congestion-prediction

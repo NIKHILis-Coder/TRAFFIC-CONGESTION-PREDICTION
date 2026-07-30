@@ -1,12 +1,13 @@
 # Intelligent Network Congestion Prediction & Adaptive Routing
 # Python 3.12 (see README for why not 3.13/3.14)
-# Pinned to the versions actually installed and verified in this project's venv.
+#
+# Only direct dependencies are listed. scipy is not pinned here because nothing
+# imports it directly - it arrives as a dependency of scikit-learn and xgboost.
 
 # --- core numerics / data ---
 numpy==2.5.1
 pandas==3.0.5
-scipy==1.18.0
-pyarrow==25.0.0          # parquet engine for data/processed/
+pyarrow==25.0.0          # parquet engine pandas uses for data/processed/
 
 # --- graph + routing (Dijkstra, dynamic edge costs) ---
 networkx==3.6.1
@@ -17,12 +18,16 @@ xgboost==3.3.0
 
 # --- visualisation ---
 matplotlib==3.11.1
-seaborn==0.13.2
 
-# --- config / utilities ---
-PyYAML==6.0.3
-tqdm==4.70.0
-
-# --- notebooks (the pipeline lives here) ---
-jupyter==1.1.1
-nbformat==5.10.4
+# --- running the notebooks ---
+# Deliberately NOT the `jupyter` metapackage. That pulls in ipywidgets, whose
+# bundled labextension files sit ~150 characters deep
+# (share/jupyter/labextensions/@jupyter-widgets/jupyterlab-manager/static/...).
+# On Windows without long-path support enabled, cloning into a moderately nested
+# directory pushes those past the 260-character MAX_PATH limit and pip install
+# fails outright. These three cover everything this project actually does:
+# open notebooks, execute them headlessly (scripts/run_notebook.sh), and provide
+# the kernel they run in.
+notebook==7.6.1
+nbconvert==7.17.1
+ipykernel==7.3.0
