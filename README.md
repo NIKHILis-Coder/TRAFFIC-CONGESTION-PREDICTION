@@ -1,5 +1,49 @@
 # Intelligent Network Congestion Prediction & Adaptive Routing
 
+## Results at a Glance
+
+Six months of real traffic from the Internet2 Abilene backbone (2004) — **48,096
+five-minute snapshots across 30 links**, with real OC-192/OC-48 capacities and real
+OSPF weights. Two goals: classify link congestion, and reroute traffic with Dijkstra
+to pull load off the busiest links.
+
+**Peak link utilisation reduced by 2.4%** on congested periods (44.79% → 43.72%);
+series peak 75.36% → 74.48%, with no link pushed above capacity.
+
+**Congestion classifier reaches macro-F1 0.81** — comfortably ahead of a naive
+baseline (0.19), but it does **not** beat persistence (0.82). That is reported as
+measured rather than tuned away, and the reason is understood: see below.
+
+![Peak link utilisation across six months](figures/02_utilisation_timeline.png)
+
+*Peak utilisation over the full 24 weeks. Grey bands are gaps in the source data.
+The April–May and September bursts were each traced to specific origin–destination
+flows in the raw traffic matrices.*
+
+![Adaptive routing, before vs after](figures/04_routing_before_after.png)
+
+*Left: every congested timestep, OSPF vs adaptive — points below the diagonal are
+improvements. Right: peak utilisation per link.* **Why only 2.4%:** at the busiest
+moment a single OD flow carries **57% of all traffic on the network**, and 57.6% of
+a 9.92 Gbps link by itself. Single-path routing must place that whole flow on one
+path, so every link it crosses is ≥57.6% regardless of cost function. Beating that
+needs flow *splitting* (ECMP / MPLS-TE) — a different mechanism. Identifying that
+binding constraint is the more useful result than the percentage.
+
+![Model vs baselines](figures/03_model_vs_baselines.png)
+
+*The model beats the naive baseline at every horizon and never beats persistence,
+with the gap widening as the horizon grows. Notebook 07 tested the obvious
+follow-up — letting the model see neighbouring links — and found congestion does not
+propagate along paths, so a neighbour is a redundant copy rather than an early
+warning.*
+
+▸ **[`notebooks/09_results_showcase.ipynb`](notebooks/09_results_showcase.ipynb)** —
+the same results with the network diagram, rendered inline. Reads only saved
+artefacts, runs in under 30 seconds.
+
+---
+
 An end-to-end machine-learning pipeline that **predicts congestion on network links**
 from real backbone traffic measurements, then **adaptively reroutes traffic** using
 Dijkstra's algorithm with dynamic edge-cost recalculation to reduce peak link
@@ -195,8 +239,10 @@ TRAFFIC-CONGESTION-PREDICTION/
 │   ├── 05_baseline_model.ipynb
 │   ├── 06_forecast_horizons.ipynb
 │   ├── 07_crosslink_premise.ipynb
-│   └── 08_adaptive_routing.ipynb
-├── results/                     # empty — charts render inline in the notebooks
+│   ├── 08_adaptive_routing.ipynb
+│   └── 09_results_showcase.ipynb   # charts only, <30s, reads saved artefacts
+├── figures/                     # PNGs embedded in this README
+├── results/                     # empty — charts render inline; exports go to figures/
 │   ├── figures/
 │   └── metrics/
 ├── scripts/
