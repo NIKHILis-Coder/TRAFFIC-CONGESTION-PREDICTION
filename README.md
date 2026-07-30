@@ -299,8 +299,24 @@ python -c "import numpy, pandas, networkx, xgboost, sklearn; print('ok')"
 Then open the notebooks — each ends with pass/fail sanity checks that confirm the
 pipeline is working.
 
-Notebooks 05, 06 and 08 train models or reroute all 48,096 timesteps and take
-15–25 minutes each. To run one unattended:
+### What the long notebooks need
+
+Notebooks 05, 06 and 08 train models or reroute all 48,096 timesteps:
+
+| Notebook | Typical runtime | Peak memory |
+|---|---|---|
+| 05 baseline model | ~10 min | ~1.5 GB (XGBoost on 1.2M rows) |
+| 06 forecast horizons | ~19 min | ~1.5 GB |
+| 08 adaptive routing | ~20 min | ~0.5 GB |
+
+**Give them at least 2 GB of free RAM.** These are modest requirements, but on a
+memory-constrained machine the kernel gets paged out and the routing loop in 08
+slows by roughly 10× — it still finishes and still produces identical results, it
+just takes hours instead of minutes. If a run appears to hang, check free memory
+before suspecting the code; `logs/nb08_progress.log` reports progress every 5,000
+timesteps so a stall is easy to distinguish from slow progress.
+
+To run one unattended:
 
 ```bash
 bash scripts/run_notebook.sh notebooks/08_adaptive_routing.ipynb
